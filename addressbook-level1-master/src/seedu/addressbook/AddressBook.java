@@ -126,6 +126,10 @@ public class AddressBook {
     private static final String COMMAND_EXIT_DESC = "Exits the program.";
     private static final String COMMAND_EXIT_EXAMPLE = COMMAND_EXIT_WORD;
 
+    private static final String COMMAND_SORT_WORD = "sort";
+    private static final String COMMAND_SORT_DESC = "List all persons alphabetically.";
+    private static final String COMMAND_SORT_EXAMPLE = COMMAND_SORT_WORD;
+
     private static final String DIVIDER = "===================================================";
 
 
@@ -374,6 +378,8 @@ public class AddressBook {
             return getUsageInfoForAllCommands();
         case COMMAND_EXIT_WORD:
             executeExitProgramRequest();
+        case COMMAND_SORT_WORD:
+            return executeSortAllPersonsInAddressBook();
         default:
             return getMessageForInvalidCommandInput(commandType, getUsageInfoForAllCommands());
         }
@@ -575,6 +581,27 @@ public class AddressBook {
         ArrayList<HashMap<PersonProperty, String>> toBeDisplayed = getAllPersonsInAddressBook();
         showToUser(toBeDisplayed);
         return getMessageForPersonsDisplayedSummary(toBeDisplayed);
+    }
+
+    /**
+     * Displays all persons in the address book to the user; in alphabetical order.
+     *
+     * @return feedback display message for the operation result
+     */
+    private static String executeSortAllPersonsInAddressBook() {
+        ArrayList<HashMap<PersonProperty, String>> toBeDisplayed = getAllPersonsInAddressBook();
+
+        Comparator<HashMap<PersonProperty, String>> byName =
+                (HashMap<PersonProperty, String> firstPerson, HashMap<PersonProperty, String> secondPerson)
+                -> firstPerson.get(PersonProperty.NAME).compareToIgnoreCase(secondPerson.get(PersonProperty.NAME));
+
+        ArrayList<HashMap<PersonProperty, String>> sortedPersonsList =
+                (ArrayList<HashMap<PersonProperty, String>>) toBeDisplayed.clone();
+
+        Collections.sort(sortedPersonsList, byName);
+        showToUser(sortedPersonsList);
+
+        return getMessageForPersonsDisplayedSummary(sortedPersonsList);
     }
 
     /**
@@ -1090,7 +1117,8 @@ public class AddressBook {
                 + getUsageInfoForDeleteCommand() + LS
                 + getUsageInfoForClearCommand() + LS
                 + getUsageInfoForExitCommand() + LS
-                + getUsageInfoForHelpCommand();
+                + getUsageInfoForHelpCommand() + LS
+                + getUsageInfoForSortCommand();
     }
 
     /** Returns the string for showing 'add' command usage instruction */
@@ -1138,6 +1166,11 @@ public class AddressBook {
                 + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_EXIT_EXAMPLE);
     }
 
+    /** Returns the string for showing 'sort' command usage instruction */
+    private static String getUsageInfoForSortCommand() {
+        return String.format(MESSAGE_COMMAND_HELP, COMMAND_SORT_WORD, COMMAND_SORT_DESC) + LS
+                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_SORT_EXAMPLE) + LS;
+    }
 
     /*
      * ============================
