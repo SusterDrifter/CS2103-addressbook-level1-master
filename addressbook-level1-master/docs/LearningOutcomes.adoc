@@ -82,7 +82,7 @@ Learn https://se-edu.github.io/se-book/cppToJava/collections/[how to use some Ja
 
 === Exercise: Use `HashMap`
 
-Currently, a person's details are stored as a `String[]`. Modify the code to use a `HashMap<String, String>` instead.
+Currently, a person's details are stored as a `String[]`. Modify the code to use a `HashMap<PersonProperty, String>` instead.
 A sample code snippet is given below.
 
 [source,java]
@@ -91,7 +91,7 @@ private static final String PERSON_PROPERTY_NAME = "name";
 private static final String PERSON_PROPERTY_EMAIL = "email";
 ...
 HashMap<String,String> john = new HashMap<>();
-john.put(PERSON_PROPERTY_NAME, "John Doe");
+john.put(PersonProperty.NAME, "John Doe");
 john.put(PERSON_PROPERTY_EMAIL, "john.doe@email.com");
 //etc.
 ----
