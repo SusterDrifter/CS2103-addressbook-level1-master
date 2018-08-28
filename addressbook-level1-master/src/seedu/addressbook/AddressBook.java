@@ -60,6 +60,8 @@ public class AddressBook {
      */
     private static final String MESSAGE_ADDED = "New person added: %1$s, Phone: %2$s, Email: %3$s";
     private static final String MESSAGE_ADDRESSBOOK_CLEARED = "Address book has been cleared!";
+    private static final String MESSAGE_ADDRESSBOOK_EDITED = "Address book has been edited!";
+    private static final String MESSAGE_ADDRESSBOOK_EDIT_FAIL = "Unable to edit the address book.";
     private static final String MESSAGE_COMMAND_HELP = "%1$s: %2$s";
     private static final String MESSAGE_COMMAND_HELP_PARAMETERS = "\tParameters: %1$s";
     private static final String MESSAGE_COMMAND_HELP_EXAMPLE = "\tExample: %1$s";
@@ -130,6 +132,12 @@ public class AddressBook {
     private static final String COMMAND_SORT_DESC = "List all persons alphabetically.";
     private static final String COMMAND_SORT_EXAMPLE = COMMAND_SORT_WORD;
 
+    private static final String COMMAND_EDIT_WORD = "edit";
+    private static final String COMMAND_EDIT_DESC = "Edit properties of a person.";
+    private static final String COMMAND_EDIT_PARAMETERS = "NAME FIELD VALUE";
+    private static final String COMMAND_EDIT_EXAMPLE = COMMAND_EDIT_WORD + " John phone "
+                                                    + PERSON_DATA_PREFIX_PHONE + "86470978";
+
     private static final String DIVIDER = "===================================================";
 
 
@@ -138,7 +146,17 @@ public class AddressBook {
      * used by the internal String[] storage format.
      * For example, a person's name is stored as the 0th element in the array.
      */
-    private enum PersonProperty {NAME, PHONE, EMAIL};
+    private enum PersonProperty {
+        NAME("name"),
+        PHONE("phone"),
+        EMAIL("email");
+
+        public final String keyword;
+
+        PersonProperty(String keyword) {
+            this.keyword = keyword;
+        }
+    }
 
     /**
      * The number of data elements for a single person.
@@ -363,6 +381,7 @@ public class AddressBook {
         final String[] commandTypeAndParams = splitCommandWordAndArgs(userInputString);
         final String commandType = commandTypeAndParams[0];
         final String commandArgs = commandTypeAndParams[1];
+
         switch (commandType) {
         case COMMAND_ADD_WORD:
             return executeAddPerson(commandArgs);
@@ -376,10 +395,12 @@ public class AddressBook {
             return executeClearAddressBook();
         case COMMAND_HELP_WORD:
             return getUsageInfoForAllCommands();
-        case COMMAND_EXIT_WORD:
-            executeExitProgramRequest();
         case COMMAND_SORT_WORD:
             return executeSortAllPersonsInAddressBook();
+        case COMMAND_EDIT_WORD:
+            return executeEditPersonInfo(commandArgs);
+        case COMMAND_EXIT_WORD:
+            executeExitProgramRequest();
         default:
             return getMessageForInvalidCommandInput(commandType, getUsageInfoForAllCommands());
         }
@@ -448,7 +469,8 @@ public class AddressBook {
      */
     private static String executeFindPersons(String commandArgs) {
         final Set<String> keywords = extractKeywordsFromFindPersonArgs(commandArgs);
-        final ArrayList<HashMap<PersonProperty, String>> personsFound = getPersonsWithNameContainingAnyKeyword(keywords);
+        final ArrayList<HashMap<PersonProperty, String>> personsFound =
+                getPersonsWithNameContainingAnyKeyword(keywords);
         showToUser(personsFound);
         return getMessageForPersonsDisplayedSummary(personsFound);
     }
@@ -483,14 +505,23 @@ public class AddressBook {
     private static ArrayList<HashMap<PersonProperty, String>> getPersonsWithNameContainingAnyKeyword(
             Collection<String> keywords) {
         final ArrayList<HashMap<PersonProperty, String>> matchedPersons = new ArrayList<>();
+
+        boolean personAdded = false;
         for (HashMap<PersonProperty, String> person : getAllPersonsInAddressBook()) {
             final Set<String> wordsInName = new HashSet<>(splitByWhitespace(getNameFromPerson(person)));
+            personAdded = false;
 
             for (String name: wordsInName) {
                 for (String searchKey: keywords) {
-                    if (name.matches("(?i:" + searchKey + ")") && !matchedPersons.contains(person)) {
+                    if (name.matches("(?i:" + searchKey + ")")) {
                         matchedPersons.add(person);
+                        personAdded = true;
+                        break;
                     }
+                }
+
+                if (personAdded) {
+                    break;
                 }
             }
         }
@@ -548,7 +579,8 @@ public class AddressBook {
      * @return whether it is valid
      */
     private static boolean isDisplayIndexValidForLastPersonListingView(int index) {
-        return index >= DISPLAYED_INDEX_OFFSET && index < latestPersonListingView.size() + DISPLAYED_INDEX_OFFSET;
+        return index >= DISPLAYED_INDEX_OFFSET && index < latestPersonListingView.size()
+                + DISPLAYED_INDEX_OFFSET;
     }
 
     /**
@@ -602,6 +634,78 @@ public class AddressBook {
         showToUser(sortedPersonsList);
 
         return getMessageForPersonsDisplayedSummary(sortedPersonsList);
+    }
+
+    /**
+     * Edit particular person info in the address book.
+     *
+     * @param commandArgs full command args string from the user
+     * @return feedback display message for the operation result
+     */
+    private static String executeEditPersonInfo(String commandArgs) {
+
+        // Check whether commandArgs is valid or not
+        final List<String> args = splitByWhitespace(commandArgs);
+        // TODO: Refactor and generalise with function
+        if (args.size() < 3) {
+            return MESSAGE_ADDRESSBOOK_EDIT_FAIL;
+        }
+
+        // If yes, split it by whitespace && extract the name, field, newValue
+        final String personName = args.get(0);
+        final String field = args.get(1);
+        final String newValue = args.get(2);
+
+        // Find the particular person, taken from executeFindPersons
+        // TODO: Abstract it
+        final Set<String> keywords = extractKeywordsFromFindPersonArgs(personName);
+        final ArrayList<HashMap<PersonProperty, String>> personsFound
+                = getPersonsWithNameContainingAnyKeyword(keywords);
+
+        Optional<PersonProperty> fieldToBeEdited = extractPersonPropertyFromString(field);
+
+        // Checks whether field to edit and new value input is valid
+        if (!fieldToBeEdited.isPresent() || !isValueFittingForField(fieldToBeEdited.get(), newValue)) {
+            return MESSAGE_ADDRESSBOOK_EDIT_FAIL;
+        }
+
+        // Edit the info
+        for (HashMap<PersonProperty, String> person : personsFound) {
+            switch (fieldToBeEdited.get()) {
+                case NAME:
+                    person.put(PersonProperty.NAME, newValue);
+                break;
+                case PHONE:
+                    person.put(PersonProperty.PHONE, newValue);
+                break;
+                case EMAIL:
+                    person.put(PersonProperty.EMAIL, newValue);
+                break;
+            }
+        }
+
+        savePersonsToFile(getAllPersonsInAddressBook(), storageFilePath);
+        showToUser(personsFound);
+        return MESSAGE_ADDRESSBOOK_EDITED;
+    }
+
+    /**
+     * Checks whether the value input for corresponding PersonProperty is valid.
+     * @param fieldType the person property type.
+     * @param newValue the value to be checked.
+     * @return true if the value fits the field.
+     */
+    private static boolean isValueFittingForField(PersonProperty fieldType, String newValue) {
+        switch(fieldType) {
+            case NAME:
+                return isPersonNameValid(newValue);
+            case EMAIL:
+                return isPersonEmailValid(newValue);
+            case PHONE:
+                return isPersonPhoneValid(newValue);
+            default:
+                return false;
+        }
     }
 
     /**
@@ -1053,6 +1157,25 @@ public class AddressBook {
     }
 
     /**
+     * Extracts PersonProperty from field string representation
+     *
+     * @param field field string representation
+     * @return if field is present: PersonProperty enum of the field
+     *         else: empty Optional
+     */
+    private static Optional<PersonProperty> extractPersonPropertyFromString(String field) {
+        Optional<PersonProperty> property = Optional.empty();
+        if (field.equalsIgnoreCase(PersonProperty.NAME.keyword)) {
+            property = Optional.of(PersonProperty.NAME);
+        } else if (field.equalsIgnoreCase(PersonProperty.PHONE.keyword)) {
+            property = Optional.of(PersonProperty.PHONE);
+        } else if (field.equalsIgnoreCase(PersonProperty.EMAIL.keyword)) {
+            property = Optional.of(PersonProperty.EMAIL);
+        }
+        return property;
+    }
+
+    /**
      * Returns true if the given person's data fields are valid
      *
      * @param person String array representing the person (used in internal data)
@@ -1113,12 +1236,13 @@ public class AddressBook {
     private static String getUsageInfoForAllCommands() {
         return getUsageInfoForAddCommand() + LS
                 + getUsageInfoForFindCommand() + LS
-                + getUsageInfoForViewCommand() + LS
+                + getUsageInfoForListCommand() + LS
                 + getUsageInfoForDeleteCommand() + LS
                 + getUsageInfoForClearCommand() + LS
                 + getUsageInfoForExitCommand() + LS
                 + getUsageInfoForHelpCommand() + LS
-                + getUsageInfoForSortCommand();
+                + getUsageInfoForSortCommand() + LS
+                + getUsageInfoForEditCommand();
     }
 
     /** Returns the string for showing 'add' command usage instruction */
@@ -1148,28 +1272,35 @@ public class AddressBook {
                 + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_CLEAR_EXAMPLE) + LS;
     }
 
-    /** Returns the string for showing 'view' command usage instruction */
-    private static String getUsageInfoForViewCommand() {
+    /** Returns the string for showing 'list' command usage instruction */
+    private static String getUsageInfoForListCommand() {
         return String.format(MESSAGE_COMMAND_HELP, COMMAND_LIST_WORD, COMMAND_LIST_DESC) + LS
                 + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_LIST_EXAMPLE) + LS;
     }
 
     /** Returns string for showing 'help' command usage instruction */
     private static String getUsageInfoForHelpCommand() {
-        return String.format(MESSAGE_COMMAND_HELP, COMMAND_HELP_WORD, COMMAND_HELP_DESC)
-                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_HELP_EXAMPLE);
+        return String.format(MESSAGE_COMMAND_HELP, COMMAND_HELP_WORD, COMMAND_HELP_DESC) + LS
+                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_HELP_EXAMPLE) + LS;
     }
 
     /** Returns the string for showing 'exit' command usage instruction */
     private static String getUsageInfoForExitCommand() {
-        return String.format(MESSAGE_COMMAND_HELP, COMMAND_EXIT_WORD, COMMAND_EXIT_DESC)
-                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_EXIT_EXAMPLE);
+        return String.format(MESSAGE_COMMAND_HELP, COMMAND_EXIT_WORD, COMMAND_EXIT_DESC) + LS
+                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_EXIT_EXAMPLE) + LS;
     }
 
     /** Returns the string for showing 'sort' command usage instruction */
     private static String getUsageInfoForSortCommand() {
         return String.format(MESSAGE_COMMAND_HELP, COMMAND_SORT_WORD, COMMAND_SORT_DESC) + LS
                 + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_SORT_EXAMPLE) + LS;
+    }
+
+    /** Returns the string for showing 'edit' command usage instruction */
+    private static String getUsageInfoForEditCommand() {
+        return String.format(MESSAGE_COMMAND_HELP, COMMAND_EDIT_WORD, COMMAND_EDIT_DESC) + LS
+                + String.format(MESSAGE_COMMAND_HELP_PARAMETERS, COMMAND_EDIT_PARAMETERS) + LS
+                + String.format(MESSAGE_COMMAND_HELP_EXAMPLE, COMMAND_EDIT_EXAMPLE) + LS;
     }
 
     /*
