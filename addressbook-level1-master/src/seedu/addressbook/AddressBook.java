@@ -175,7 +175,7 @@ public class AddressBook {
 
     /*
      * This variable is declared for the whole class (instead of declaring it
-     * inside the readUserCommand() method to facilitate automated testing using
+     * inside the readUasdasdasdserCommand() method to facilitate automated testing using
      * the I/O redirection technique. If not, only the first line of the input
      * text file will be processed.
      */
